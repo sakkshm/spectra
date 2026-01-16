@@ -106,3 +106,49 @@ class DatabaseHandler:
         except Exception as e:
             self._connection.rollback()
             print(f"Failed to mark song {song_id} as fingerprinted: {e}")
+
+    def find_song_from_hashes(self, hashes, limit = 3, min_votes=20, min_confidence=0.15):
+
+        total_hashes = len(hashes)
+
+        hash_list = [h for h, _ in hashes]
+        offset_list = [int(t) for _, t in hashes]
+
+        query = """
+            WITH query_hashes(hash, query_offset) AS (
+                SELECT * FROM unnest(%s::bytea[], %s::int[])
+            )
+            SELECT
+                s.song_id,
+                s.song_name,
+                COUNT(*) AS votes,
+                COUNT(*)::float / %s AS confidence
+            FROM fingerprints f
+            JOIN query_hashes q
+            ON f.hash = q.hash
+            JOIN songs s ON s.song_id = f.song_id
+            GROUP BY s.song_id, s.song_name
+            HAVING COUNT(*) >= %s AND COUNT(*)::float / %s >= %s
+            ORDER BY votes DESC, confidence DESC
+            LIMIT %s;
+        """
+
+        params = [hash_list, offset_list, total_hashes, min_votes, total_hashes, min_confidence, limit]
+
+        with self._connection.cursor() as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+
+        if not rows:
+            raise RuntimeError("No matching song found")
+
+        results = []
+        for song_id, song_name, votes, confidence in rows:
+            results.append({
+                "song_id": song_id,
+                "song_name": song_name,
+                "votes": votes,
+                "confidence": confidence
+            })
+
+        return results
