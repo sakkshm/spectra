@@ -36,14 +36,26 @@ class DatabaseHandler:
                 self._connection.close()
                 self._connection = None
         except Exception:
-            # Ignore exceptions during garbage collection
             pass
 
-    def insert_song_metadata(self, song_name, fingerprinted=False, max_retries=3):
+    def insert_song_metadata(self, metadata: dict, fingerprinted=False, max_retries=3):
+        """
+        Inserts a song into the 'songs' table with metadata.
+        metadata: song_name, video_id, title, artist, album, album_art, webpage_url
+        """
+
+        song_name = metadata.get("song_name") or metadata.get("title")
+        video_id = metadata.get("video_id")
+        title = metadata.get("title")
+        artist = metadata.get("artist")
+        album = metadata.get("album")
+        album_art = metadata.get("album_art")
+        webpage_url = metadata.get("webpage_url")
 
         query = """
-            INSERT INTO songs (song_name, fingerprinted)
-            VALUES (%s, %s)
+            INSERT INTO songs 
+                (song_name, video_id, title, artist, album, album_art, webpage_url, fingerprinted)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (song_name) DO NOTHING
             RETURNING song_id;
         """
@@ -51,27 +63,35 @@ class DatabaseHandler:
         for attempt in range(max_retries):
             try:
                 with self._connection.cursor() as cur:
-                    cur.execute(query, (song_name, fingerprinted))
+                    cur.execute(query, (
+                        song_name, video_id, title, artist, album, album_art, webpage_url, fingerprinted
+                    ))
                     result = cur.fetchone()
 
                     if result is None:
-                        # Song already exists
-                        raise RuntimeError(f"Song '{song_name}' already exists in the database.")
+                        # Song already exists, fetch its ID
+                        cur.execute("SELECT song_id FROM songs WHERE song_name = %s", (song_name,))
+                        result = cur.fetchone()
+                        if result:
+                            song_id = result[0]
+                        else:
+                            raise RuntimeError(f"Failed to get song_id for existing song '{song_name}'")
+                    else:
+                        song_id = result[0]
 
-                    song_id = result[0]
                     self._connection.commit()
-
                 return song_id
 
             except Exception as e:
                 self._connection.rollback()
                 print(f"Attempt {attempt+1}/{max_retries} failed to insert song '{song_name}': {e}")
 
-        else:
-            raise RuntimeError(f"Failed to insert song '{song_name}' after {max_retries} retries")
+        raise RuntimeError(f"Failed to insert song '{song_name}' after {max_retries} retries")
 
     def bulk_insert_fingerprints(self, hashes, song_id, chunk_size=10000, max_retries=3):
-        
+        """
+        Inserts fingerprints for a song into the 'fingerprints' table.
+        """
         for i in range(0, len(hashes), chunk_size):
             chunk = hashes[i : i + chunk_size]
 
@@ -100,7 +120,6 @@ class DatabaseHandler:
                     (song_id,)
                 )
                 self._connection.commit()
-        
                 print(f"Song {song_id} marked as fingerprinted")
         
         except Exception as e:
@@ -108,9 +127,13 @@ class DatabaseHandler:
             print(f"Failed to mark song {song_id} as fingerprinted: {e}")
 
     def find_song_from_hashes(self, hashes, limit = 3, min_votes=20, min_confidence=0.15):
+        """
+        Find the most likely songs from a list of (hash, time_offset) tuples
+        """
+        if not hashes:
+            return []
 
         total_hashes = len(hashes)
-
         hash_list = [h for h, _ in hashes]
         offset_list = [int(t) for _, t in hashes]
 
@@ -124,8 +147,7 @@ class DatabaseHandler:
                 COUNT(*) AS votes,
                 COUNT(*)::float / %s AS confidence
             FROM fingerprints f
-            JOIN query_hashes q
-            ON f.hash = q.hash
+            JOIN query_hashes q ON f.hash = q.hash
             JOIN songs s ON s.song_id = f.song_id
             GROUP BY s.song_id, s.song_name
             HAVING COUNT(*) >= %s AND COUNT(*)::float / %s >= %s
