@@ -1,9 +1,9 @@
 import os
 import random
 
-from engine.fingerprint import load_file, get_peak_points, generate_hashes
-from engine.dl_handler import download_yt_music, get_music_metadata
-from database.handler import DatabaseHandler
+from server.engine.fingerprint import load_file, get_peak_points, generate_hashes
+from server.engine.dl_handler import download_yt_music, get_music_metadata
+from server.database.handler import DatabaseHandler
 
 
 def insert_from_url(url, logging_enabled=True):
@@ -16,6 +16,7 @@ def insert_from_url(url, logging_enabled=True):
 
     if logging_enabled:
         print("Getting metadata from link...")
+   
     metadata = get_music_metadata(url)
 
     with DatabaseHandler() as db:
@@ -75,10 +76,16 @@ def match_from_file(file_path, logging_enabled=True):
             print("\nTop Matches:")
             for idx, song in enumerate(result, start=1):
                 print(f"{idx}. {song['song_name']} (ID: {song['song_id']})")
+                print(f"   Title: {song['title']}")
+                print(f"   Artist: {song['artist']}")
+                print(f"   Album: {song['album']}")
                 print(f"   Votes: {song['votes']}")
                 print(f"   Absolute Confidence: {song['confidence']:.3f}")
+                print(f"   Video ID: {song['video_id']}")
+                print(f"   URL: {song['webpage_url']}")
                 print("===================================")
         return result
+
     
     else:
         if logging_enabled:
