@@ -1,3 +1,6 @@
+import { Card, CardContent } from "../components/ui/card";
+import { ExternalLink } from "lucide-react";
+
 type Song = {
   song_id: number;
   song_name: string;
@@ -17,42 +20,55 @@ type Props = {
 
 export default function MatchResult({ results }: Props) {
   if (!results || results.length === 0) {
-    return <p>No matches found.</p>;
+    return (
+      <p className="mt-10 text-center text-sm text-gray-500">
+        No matches found
+      </p>
+    );
   }
 
   return (
-    <div style={{ marginTop: "20px" }}>
+    <div className="mt-10 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {results.map((song) => (
-        <div
+        <Card
           key={song.song_id}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            marginBottom: "15px",
-            border: "1px solid #ccc",
-            padding: "10px",
-            borderRadius: "8px",
-          }}
+          className="group bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden
+                     hover:shadow-xl hover:border-zinc-700 transition-all duration-300"
         >
-          <img
-            src={song.album_art}
-            alt={song.title}
-            style={{ width: "150px", height: "80px", marginRight: "15px", borderRadius: "4px" }}
-          />
-          <div>
-            <h3 style={{ margin: 0 }}>
-              <a href={song.webpage_url} target="_blank" rel="noopener noreferrer">
+          {/* Album Art */}
+          <div className="relative">
+            <img
+              src={song.album_art}
+              alt={song.title}
+              className="w-full h-44 object-cover"
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent" />
+          </div>
+
+          {/* Content */}
+          <CardContent className="p-4 space-y-2">
+            <h3 className="text-white font-semibold text-base leading-tight flex items-center gap-2">
+              <a
+                href={song.webpage_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+              >
                 {song.title}
               </a>
+              <ExternalLink className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition" />
             </h3>
-            <p style={{ margin: "2px 0" }}>
-              {song.artist} — {song.album}
+
+            <p className="text-sm text-gray-400">
+              {song.artist} · {song.album ? song.album : ""}
             </p>
-            <p style={{ margin: "2px 0", fontSize: "0.9em" }}>
-              Votes: {song.votes} | Confidence: {(song.confidence * 100).toFixed(1)}%
-            </p>
-          </div>
-        </div>
+
+            <div className="flex justify-between text-xs text-gray-500 pt-2">
+              <span>Votes: {song.votes}</span>
+              <span>{(song.confidence * 100).toFixed(1)}% match</span>
+            </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

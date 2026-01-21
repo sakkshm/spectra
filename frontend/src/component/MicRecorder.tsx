@@ -1,56 +1,74 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { convertToWav } from "../utils/wavUtils";
+import { Button } from "../components/ui/button";
+import { Mic, Loader2 } from "lucide-react";
 
-type MicRecorderProps = {
-  onRecordingComplete: (wavBlob: Blob) => Promise<void> | void;
+type Props = {
+  onRecordingComplete: (wav: Blob) => Promise<void>;
 };
 
-export default function MicRecorder({ onRecordingComplete }: MicRecorderProps){
-    const mediaRecorderRef = useRef<MediaRecorder|null>(null);
-    const audioChunkRef = useRef<any>([]);
-    const [recording, setRecording] = useState<boolean>(false);
+export default function MicRecorder({ onRecordingComplete }: Props) {
+  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [timer, setTimer] = useState(0);
 
-    async function startRecording() {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true
-        })
-
-        mediaRecorderRef.current = new MediaRecorder(stream);
-        audioChunkRef.current = [];
-
-        mediaRecorderRef.current.ondataavailable = (event) => {
-            audioChunkRef.current.push(event.data)
+  useEffect(() => {
+    if (!recording) return;
+    const t = setInterval(() => {
+      setTimer((v) => {
+        if (v >= 5) {
+          stop();
+          return 0;
         }
+        return v + 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [recording]);
 
-        mediaRecorderRef.current.start();
-        setRecording(true);
-    }
+  async function start() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder.current = new MediaRecorder(stream);
+    chunks.current = [];
+    mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
+    mediaRecorder.current.start();
+    setRecording(true);
+  }
 
-    async function stopRecording(){
-        if(mediaRecorderRef.current){
-            mediaRecorderRef.current.stop();
-            setRecording(false);
+  async function stop() {
+    if (!mediaRecorder.current) return;
+    setRecording(false);
+    setProcessing(true);
 
-            mediaRecorderRef.current.onstop = async () => {
-                const webmBlob = new Blob(audioChunkRef.current, {
-                    type: "audio/webm"
-                });
-    
-                const wavBlob = await convertToWav(webmBlob);
-                await onRecordingComplete(wavBlob);
-            }
-        }
-    }
+    // Stop all tracks in the stream
+    mediaRecorder.current.stream.getTracks().forEach(track => track.stop());
+
+    mediaRecorder.current.stop();
+    mediaRecorder.current.onstop = async () => {
+      const webm = new Blob(chunks.current);
+      const wav = await convertToWav(webm);
+      await onRecordingComplete(wav);
+      setProcessing(false);
+    };
+  }
 
   return (
-    <div>
-      <button onClick={startRecording} disabled={recording}>
-        Start Recording
-      </button>
-
-      <button onClick={stopRecording} disabled={!recording}>
-        Stop & Upload
-      </button>
+    <div className="flex flex-col items-center">
+      <Button
+        onClick={recording ? stop : start}
+        disabled={processing}
+        className={`relative w-25 h-25 rounded-full bg-zinc-900 border border-zinc-600
+        hover:bg-zinc-800 transition-all`}
+      >
+        {processing ? (
+          <Loader2 className="w-12! h-12! animate-spin" />
+        ) : (
+          <Mic className={`w-12! h-12! ${recording ? "text-red-400 animate-pulse" : ""}`} />
+        )}
+        {recording && <span className="absolute inset-0 rounded-full animate-ping border border-red-500/70" />}
+      </Button>
     </div>
   );
 }
