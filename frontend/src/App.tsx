@@ -3,7 +3,7 @@ import { useState } from "react";
 import MicRecorder from "./component/MicRecorder";
 import MatchResult from "./component/MatchResult";
 import { Alert, AlertDescription } from "./components/ui/alert";
-import { AlertTriangle, AudioLines, Loader2 } from "lucide-react";
+import { AlertTriangle, AudioLines, ExternalLink, Loader2 } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
@@ -103,7 +103,19 @@ function App() {
                 <br/>
                 <br/>
             <p className="text-gray-500 text-center max-w-sm mt-6 text-sm">
-                Spectra is a proof-of-concept that currently supports a small library of under 100 songs. I’ve put together a sample playlist so you can try it out!
+                Spectra is a proof-of-concept that currently supports a small library of under 50 songs. I’ve put together a sample playlist so you can try it out!
+            <br/><br/>
+            <span>
+                <a
+                    href="https://music.youtube.com/playlist?list=PLDK9ZUC554U0p36ueSUzCbS-kCa2ONrUM"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline flex items-center justify-center"
+                >
+                    Spectra Test Playlist
+                    <ExternalLink className="ml-2 w-4 h-4 text-gray-400 transition" />
+                </a>
+            </span>
             </p>
         </>
       )}
@@ -112,7 +124,7 @@ function App() {
       {loading && (
         <div className="flex items-center space-x-2 mt-4 text-gray-300">
           <Loader2 className="animate-spin w-5 h-5 text-blue-400" />
-          <span>Matching from database...</span>
+          <span>Trying to find a match...</span>
         </div>
       )}
 

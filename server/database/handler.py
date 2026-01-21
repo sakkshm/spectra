@@ -6,18 +6,32 @@ load_dotenv()
 
 
 class DatabaseHandler:
-
     def __init__(self):
-        db_url = os.getenv("DB_URL")
-        if not db_url:
+        self._db_url = os.getenv("DB_URL")
+        if not self._db_url:
             raise RuntimeError("DB_URL not set in environment")
 
-        try:
-            self._connection = psycopg.connect(db_url)
-        except Exception as e:
-            raise RuntimeError(f"Failed to connect to database: {e}")
+        self._connection = None
+
+    def _connect(self):
+        """
+        Lazily create or re-create DB connection.
+        Safe for Supabase + pooler.
+        """
+        if self._connection is None or self._connection.closed:
+            self._connection = psycopg.connect(
+                self._db_url,
+                sslmode="require",
+                connect_timeout=5,
+            )
+            self._connection.autocommit = False
+
+    def _cursor(self):
+        self._connect()
+        return self._connection.cursor()
 
     def __enter__(self):
+        self._connect()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -29,6 +43,16 @@ class DatabaseHandler:
                 self._connection.close()
             finally:
                 self._connection = None
+
+    def health_check(self) -> bool:
+        try:
+            self._connect()
+            with self._connection.cursor() as cur:
+                cur.execute("SELECT 1;")
+                cur.fetchone()
+            return True
+        except Exception:
+            return False
 
     def insert_song_metadata(self, metadata: dict, fingerprinted=False, max_retries=3):
         """
@@ -54,7 +78,7 @@ class DatabaseHandler:
 
         for attempt in range(max_retries):
             try:
-                with self._connection.cursor() as cur:
+                with self._cursor() as cur:
                     cur.execute(
                         query,
                         (
@@ -88,10 +112,9 @@ class DatabaseHandler:
 
             except Exception as e:
                 self._connection.rollback()
-                print(f"Attempt {attempt + 1}/{max_retries} failed inserting song: {e}")
+                print(f"[DB] Attempt {attempt + 1}/{max_retries} failed inserting song: {e}")
 
         raise RuntimeError(f"Failed to insert song '{song_name}' after retries")
-
 
     def bulk_insert_fingerprints(self, hashes, song_id, chunk_size=10_000, max_retries=3):
         """
@@ -104,7 +127,7 @@ class DatabaseHandler:
 
             for attempt in range(max_retries):
                 try:
-                    with self._connection.cursor() as cur:
+                    with self._cursor() as cur:
                         cur.executemany(
                             """
                             INSERT INTO fingerprints (hash, song_id, time_offset)
@@ -118,7 +141,7 @@ class DatabaseHandler:
                 except Exception as e:
                     self._connection.rollback()
                     print(
-                        f"Attempt {attempt + 1}/{max_retries} failed "
+                        f"[DB] Attempt {attempt + 1}/{max_retries} failed "
                         f"for fingerprint chunk starting at {i}: {e}"
                     )
 
@@ -127,7 +150,7 @@ class DatabaseHandler:
 
         # Mark song as fingerprinted
         try:
-            with self._connection.cursor() as cur:
+            with self._cursor() as cur:
                 cur.execute(
                     "UPDATE songs SET fingerprinted = TRUE WHERE song_id = %s",
                     (song_id,),
@@ -135,8 +158,7 @@ class DatabaseHandler:
             self._connection.commit()
         except Exception as e:
             self._connection.rollback()
-            print(f"Failed to mark song {song_id} as fingerprinted: {e}")
-
+            print(f"[DB] Failed to mark song {song_id} as fingerprinted: {e}")
 
     def find_song_from_hashes(
         self,
@@ -192,7 +214,7 @@ class DatabaseHandler:
             limit,
         ]
 
-        with self._connection.cursor() as cur:
+        with self._cursor() as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
 

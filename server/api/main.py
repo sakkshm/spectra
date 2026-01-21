@@ -7,6 +7,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from server.database.handler import DatabaseHandler
 from server.engine.handler import match_from_file
 
 app = FastAPI()
@@ -62,3 +63,36 @@ async def task_status(task_id: str):
         return JSONResponse({"error": "Invalid task_id"}, status_code=404)
 
     return task
+
+@app.get("/ping")
+def home():
+    return {
+        "msg": "spectra-api"
+    }
+
+@app.get("/health")
+def health():
+    checks = {}
+
+    # ThreadPool status
+    checks["thread_pool"] = not POOL._shutdown
+
+    # Filesystem write test
+    try:
+        with tempfile.NamedTemporaryFile(delete=True) as f:
+            f.write(b"ping")
+        checks["filesystem"] = True
+    except Exception:
+        checks["filesystem"] = False
+
+    # Database check
+    with DatabaseHandler() as db:
+        checks["database"] = db.health_check()
+
+    status = "ok" if all(checks.values()) else "degraded"
+
+    return {
+        "status": status,
+        "service": "spectra-api",
+        "checks": checks
+    }
