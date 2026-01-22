@@ -14,7 +14,7 @@ export default function MicRecorder({ onRecordingComplete }: Props) {
   const chunks = useRef<Blob[]>([]);
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [timer, setTimer] = useState(0);
+  const [_, setTimer] = useState(0);
 
   useEffect(() => {
     if (!recording) return;
