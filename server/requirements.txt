@@ -1,0 +1,7 @@
+fastapi
+librosa
+numpy
+psycopg
+python-dotenv
+scipy
+slowapi

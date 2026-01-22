@@ -92,7 +92,7 @@ def download_yt_music(track):
     os.makedirs(download_dir, exist_ok=True)
 
     # Download audio
-    print(f"Downloading audio file for: {track.get("title")} - {track.get("artist")} ({track.get("video_id")})")
+    print(f"Downloading audio file for: {track.get('title')} - {track.get('artist')} ({track.get('video_id')})")
 
     try:
         subprocess.run(
