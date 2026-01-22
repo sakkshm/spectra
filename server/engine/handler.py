@@ -1,6 +1,8 @@
 import os
 import random
 
+import numpy as np
+
 from server.engine.fingerprint import load_file, get_peak_points, generate_hashes
 from server.engine.dl_handler import download_yt_music, get_music_metadata
 from server.database.handler import DatabaseHandler
@@ -61,12 +63,15 @@ def match_from_file(file_path, logging_enabled=True):
     """
 
     y, _ = load_file(filename=file_path)
+
+    if np.max(np.abs(y)) < 1e-3:
+        raise Exception("Microphone captured silence")
+
     peak_points = get_peak_points(y=y)
     hashes = generate_hashes(peak_points=peak_points)
 
-    if logging_enabled:
-        print(f"Generated {len(hashes)} hashes")
-
+    print(f"Generated {len(hashes)} hashes")
+    
     sampled_hashes = random.sample(hashes, min(5000, len(hashes)))
     with DatabaseHandler() as db:
         result = db.find_song_from_hashes(sampled_hashes)

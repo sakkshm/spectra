@@ -2,10 +2,13 @@ import os
 import shutil
 import tempfile
 import uuid
+
 from concurrent.futures import ThreadPoolExecutor
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
 
 from server.database.handler import DatabaseHandler
 from server.engine.handler import match_from_file
@@ -20,7 +23,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory task store
+
+# Use IP address by default
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(429, _rate_limit_exceeded_handler)
+
+# Task store
 # task_id -> {"status": "pending"/"success"/"fail", "result": ..., "error": ...}
 TASKS = {}  
 
@@ -41,7 +50,8 @@ def process_audio(task_id: str, file_path: str):
 
 
 @app.post("/match_file")
-async def match_file(file: UploadFile = File(...)):
+@limiter.limit("3/minute")
+async def match_file(request: Request, file: UploadFile = File(...)):
     # Save temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         shutil.copyfileobj(file.file, tmp)
@@ -57,7 +67,8 @@ async def match_file(file: UploadFile = File(...)):
 
 
 @app.get("/task_status/{task_id}")
-async def task_status(task_id: str):
+@limiter.limit("30/minute")
+async def task_status(request: Request, task_id: str):
     task = TASKS.get(task_id)
     if not task:
         return JSONResponse({"error": "Invalid task_id"}, status_code=404)
@@ -65,13 +76,15 @@ async def task_status(task_id: str):
     return task
 
 @app.get("/ping")
-def home():
+@limiter.limit("30/minute")
+def home(request: Request):
     return {
         "msg": "spectra-api"
     }
 
 @app.get("/health")
-def health():
+@limiter.limit("5/minute")
+def health(request: Request):
     checks = {}
 
     # ThreadPool status
