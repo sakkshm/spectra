@@ -5,7 +5,7 @@ import MatchResult from "./component/MatchResult";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { AlertTriangle, AudioLines, ExternalLink, Loader2 } from "lucide-react";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 function App() {
   const [loading, setLoading] = useState(false);
@@ -16,9 +16,7 @@ function App() {
     return new Promise((resolve, reject) => {
       const interval = setInterval(async () => {
         try {
-          const response = await fetch(
-            `${BACKEND_URL}/task_status/${task_id}`
-          );
+          const response = await fetch(`${BACKEND_URL}/task_status/${task_id}`);
           if (!response.ok) throw new Error("Failed to fetch task status");
 
           const data = await response.json();
@@ -48,7 +46,14 @@ function App() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Failed to start matching task");
+      if (!response.ok) {
+        // Handle 429 rate limit
+        if (response.status === 429) {
+          throw new Error("Rate limit exceeded. Please wait a minute and try again.");
+        } else {
+          throw new Error("Failed to start matching task");
+        }
+      }
 
       setResults([]);
 
@@ -58,7 +63,7 @@ function App() {
       if (finalResult.status === "success") {
         const res = finalResult.result || [];
         setResults(res.length > 0 ? res : []); 
-        if (res.length === 0) setError("No match found.");
+        if (res.length === 0) setError("No match found. Try again!");
       } else {
         setResults([]);
         setError("No match found.");
@@ -83,7 +88,7 @@ function App() {
         <div className="flex items-center gap-2">
             <AudioLines className="w-12 h-12"/> Spectra
         </div>
-        </h1>
+      </h1>
       <p className="text-lg text-gray-300 mb-10 text-center max-w-md">
         Identify music easily.
       </p>
@@ -96,14 +101,15 @@ function App() {
       {/* Intro paragraph if no results yet */}
       {results === null && !loading && !error && (
         <>
-            <p className="text-gray-400 text-center max-w-sm mt-6 text-lg">
+            <p className="text-gray-400 text-center max-w-xl mt-10 text-lg">
                 Press the microphone above to start recording a song snippet, 
                 and Spectra will find the match for you!
             </p>
-                <br/>
-                <br/>
-            <p className="text-gray-500 text-center max-w-sm mt-6 text-sm">
-                Spectra is a proof-of-concept that currently supports a small library of under 50 songs. I’ve put together a sample playlist so you can try it out!
+            <br/><br/>
+            <p className="text-gray-500 text-center max-w-md mt-10 text-sm">
+                Spectra is a proof-of-concept that currently supports a small 
+                library of under 50 songs. I’ve put together a sample playlist 
+                so you can try it out!
             <br/><br/>
             <span>
                 <a

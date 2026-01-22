@@ -7,6 +7,8 @@ type Props = {
   onRecordingComplete: (wav: Blob) => Promise<void>;
 };
 
+const RECORDING_DURATION = 5; // seconds
+
 export default function MicRecorder({ onRecordingComplete }: Props) {
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -18,7 +20,7 @@ export default function MicRecorder({ onRecordingComplete }: Props) {
     if (!recording) return;
     const t = setInterval(() => {
       setTimer((v) => {
-        if (v >= 5) {
+        if (v >= RECORDING_DURATION) {
           stop();
           return 0;
         }

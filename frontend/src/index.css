@@ -1,7 +1,8 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Special+Gothic+Expanded+One&display=swap');
 
-@plugin "tailwindcss-animate";
+@import "tailwindcss";
 @import "tw-animate-css";
+@plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -123,3 +124,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+body {
+  font-family: 'Special Gothic Expanded One', sans-serif;
+}
+
